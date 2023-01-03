@@ -1,0 +1,7 @@
+{
+  "name": "Twitch no Zap",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react"
+}
