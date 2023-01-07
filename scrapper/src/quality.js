@@ -6,31 +6,35 @@ import sharp from 'sharp';
 
 import EMOTES_LIST from '../emotesData.json' assert { type: "json" };
 
-const EMOTE_FOLDER_PATH = path.resolve(`./imgs/finished/`);
-const ANIMATED_FOLDER_PATH = path.resolve(EMOTE_FOLDER_PATH + `/anim`);
+const EMOTE_FOLDER_PATH = path.resolve(`../app/public/assets/emotes`);
+const ANIMATED_FOLDER_PATH = path.resolve(EMOTE_FOLDER_PATH + `/animated`);
 const STATIC_FOLDER_PATH = path.resolve(EMOTE_FOLDER_PATH + `/static`);
+const TEMP_FOLDER_PATH = path.resolve(`./imgs/_temp/`);
 
 async function improveEmotesQuality() {
     try {
         foldersSetup();
+        const animatedEmotesNames = [];
+        const staticEmotesNames = [];
 
-        for (let i = 8; i < 12/*EMOTES_LIST.length*/; i++) {
-            const originalEmotePath = path.resolve(`./imgs/${EMOTES_LIST[i].name}.webp`);
-            const tempFolderPath = path.resolve(`./imgs/_temp/${EMOTES_LIST[i].name}`);
-            fs.rmSync(tempFolderPath, { recursive: true, force: true });
-            fs.mkdirSync(tempFolderPath);
+        for (let i = 0; i < 50/*EMOTES_LIST.length*/; i++) {
+            const emoteName = EMOTES_LIST[i].name;
+
+            const originalEmotePath = path.resolve(`./imgs/${emoteName}.webp`);
+            const tempEmoteFolderPath = path.resolve(TEMP_FOLDER_PATH + `/${emoteName}`);
+            deleteFolder(tempEmoteFolderPath, true);
 
             const outputFrames = [];
             const outputSizes = { width: 512, height: 512 };
             const WebpImageInstance = await Webp.Image.getEmptyImage();
-            await WebpImageInstance.load(fs.readFileSync(originalEmotePath));
+            await WebpImageInstance.load(fs.readFileSync(originalEmotePath))
             
-            const loopLenght = WebpImageInstance.frames ? WebpImageInstance.frames.length : 1;
+            const loopLenght = WebpImageInstance.hasAnim ? WebpImageInstance.frames.length : 1;
             for (let j = 0; j < loopLenght; j++) {
                 console.log(`PROCESSING: Emote ${i+1} de ${EMOTES_LIST.length} | Frame ${j+1} de ${loopLenght}.`);
                 
-                const framePath = path.resolve(tempFolderPath + `/${EMOTES_LIST[i].name}_${j}.webp`);
-                const upscaledFramePath = path.resolve(tempFolderPath + `/${EMOTES_LIST[i].name}_${j}_upscaled.webp`);
+                const framePath = path.resolve(tempEmoteFolderPath + `/${emoteName}_${j}.webp`);
+                const upscaledFramePath = path.resolve(tempEmoteFolderPath + `/${emoteName}_${j}_upscaled.webp`);
 
                 await sharp(fs.readFileSync(originalEmotePath), { page: j })
                 .resize(
@@ -59,8 +63,8 @@ async function improveEmotesQuality() {
             await Webp.Image.save(
                 path.resolve(
                     (loopLenght === 1) ?
-                    STATIC_FOLDER_PATH + `/${EMOTES_LIST[i].name}.webp` :
-                    ANIMATED_FOLDER_PATH + `/${EMOTES_LIST[i].name}.webp`
+                    STATIC_FOLDER_PATH + `/${emoteName}.webp` :
+                    ANIMATED_FOLDER_PATH + `/${emoteName}.webp`
                 ),
                 {
                     frames: outputFrames,
@@ -69,7 +73,13 @@ async function improveEmotesQuality() {
                     blend: false
                 }
             );
+
+            WebpImageInstance.hasAnim ?
+            animatedEmotesNames.push(emoteName) :
+            staticEmotesNames.push(emoteName);
         }
+
+        createConfigJsonForAPP(animatedEmotesNames, staticEmotesNames);
     } catch (e) {
         console.log(e);
     }
@@ -79,6 +89,13 @@ function foldersSetup() {
     !fs.existsSync(EMOTE_FOLDER_PATH) ? fs.mkdirSync(EMOTE_FOLDER_PATH) : null;
     !fs.existsSync(ANIMATED_FOLDER_PATH) ? fs.mkdirSync(ANIMATED_FOLDER_PATH) : null;
     !fs.existsSync(STATIC_FOLDER_PATH) ? fs.mkdirSync(STATIC_FOLDER_PATH) : null;
+}
+
+function deleteFolder(path, shouldRecreateFolder) {
+    fs.rmSync(path, { recursive: true, force: true });
+    if (shouldRecreateFolder) {
+        fs.mkdirSync(path);
+    }
 }
 
 function runImageUpscaling(inputPath, outoutPath) {
@@ -95,6 +112,27 @@ function runImageUpscaling(inputPath, outoutPath) {
             }
         );
     });
+}
+
+function createConfigJsonForAPP(animatedEmotesNames, staticEmotesNames) {
+    const animatedNamesJson = JSON.stringify(animatedEmotesNames);
+    const staticNamesJson = JSON.stringify(staticEmotesNames);
+
+    fs.writeFile(
+        ANIMATED_FOLDER_PATH + '/emotesNames.json',
+        JSON.stringify(animatedNamesJson),
+        (err) => {
+            if (err) throw err;
+        }
+    );
+
+    fs.writeFile(
+        STATIC_FOLDER_PATH + '/emotesNames.json',
+        JSON.stringify(staticNamesJson),
+        (err) => {
+            if (err) throw err;
+        }
+    );
 }
 
 improveEmotesQuality();
